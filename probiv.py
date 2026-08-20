@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Hikka модуль: TeledoX Pro v6 (с исправленным определением бота)
+# Hikka модуль: TeledoX Pro v7 (с полной навигацией)
 # Команды: .dox (номер), .doxm (домашний), .doxf (ФИО), .doxp (паспорт)
 # Бот: @aybotrobot
 # Автор: palofsc
@@ -11,11 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 @loader.tds
-class TeledoXProV6Mod(loader.Module):
+class TeledoXProV7Mod(loader.Module):
     """Мульти-запрос к боту с управлением инлайн-кнопками"""
     
     strings = {
-        "name": "TeledoXProV6",
+        "name": "TeledoXProV7",
         "no_args": "<b>[TeledoX]</b> Укажите аргумент: <code>{}</code>",
         "searching": "<b>[TeledoX]</b> 🔍 Отправка запроса и навигация по меню...",
         "no_response": "<b>[TeledoX]</b> ⚠️ Ответ от бота не получен (тайм-аут).",
@@ -28,21 +28,18 @@ class TeledoXProV6Mod(loader.Module):
         self._client = client
         self._bot_username = "@aybotrobot"
         self._bot_entity = None
-        self._click_delay = 1.8
+        self._click_delay = 2.0
         self._response_wait = 8.0
 
     async def _get_bot_entity(self):
-        """Получение сущности бота с кешированием и обработкой ошибок"""
+        """Получение сущности бота с кешированием"""
         if self._bot_entity:
             return self._bot_entity
         
         try:
-            # Пытаемся получить сущность по username
             self._bot_entity = await self._client.get_entity(self._bot_username)
             return self._bot_entity
-        except ValueError as e:
-            logger.error(f"Bot entity not found: {e}")
-            # Пытаемся получить через диалоги
+        except ValueError:
             async for dialog in self._client.iter_dialogs():
                 if dialog.entity and hasattr(dialog.entity, 'username'):
                     if dialog.entity.username and dialog.entity.username.lower() == "aybotrobot":
@@ -55,67 +52,70 @@ class TeledoXProV6Mod(loader.Module):
         entity = await self._get_bot_entity()
         if not entity:
             return False
-        
         try:
             await self._client.edit_folder(entity, folder=1)
             await self._client.set_notify_settings(entity, silent=True, mute_until=2147483647)
             return True
-        except Exception as e:
-            logger.error(f"Setup error: {e}")
+        except Exception:
             return False
 
-    async def _click_button(self, button_text):
-        """Нажатие на кнопку через высокоуровневый метод message.click()"""
+    async def _click_button(self, button_text, retry=2):
+        """Нажатие на кнопку через message.click() с повторами"""
         entity = await self._get_bot_entity()
         if not entity:
             return False
             
-        try:
-            async for msg in self._client.iter_messages(entity, limit=2):
-                if msg.sender_id == entity.id and msg.reply_markup:
-                    await msg.click(text=button_text)
-                    await asyncio.sleep(self._click_delay)
-                    return True
-        except Exception as e:
-            logger.debug(f"Click error: {e}")
+        for attempt in range(retry):
+            try:
+                async for msg in self._client.iter_messages(entity, limit=3):
+                    if msg.sender_id == entity.id and msg.reply_markup:
+                        await msg.click(text=button_text)
+                        await asyncio.sleep(self._click_delay)
+                        return True
+            except Exception:
+                await asyncio.sleep(1.0)
         return False
 
     async def _navigate_menu(self, menu_flow):
-        """Навигация по меню через последовательные клики"""
-        if not menu_flow:
-            return True
-        for btn_text in menu_flow:
-            success = await self._click_button(btn_text)
-            if not success:
-                await asyncio.sleep(1.0)
+        """Полная навигация по меню с обязательным стартом"""
+        # Шаг 1: Нажать "GÖZLEME BAŞLA" или "Начать поиск"
+        start_buttons = ["GÖZLEME BAŞLA", "Начать поиск", "НАЧАТЬ ПОИСК"]
+        for btn in start_buttons:
+            if await self._click_button(btn):
+                break
+        await asyncio.sleep(2.0)
+        
+        # Шаг 2: Пройти по остальным кнопкам меню
+        if menu_flow:
+            for btn_text in menu_flow:
                 success = await self._click_button(btn_text)
-            if not success:
-                return False
+                if not success:
+                    await asyncio.sleep(1.0)
+                    await self._click_button(btn_text)
         return True
 
     async def _get_bot_response(self, query, menu_flow=None):
-        """Основной метод: навигация, отправка запроса, получение ответа"""
+        """Основной метод: полная навигация, отправка запроса, получение ответа"""
         entity = await self._get_bot_entity()
         if not entity:
             return None
         
         await self._setup_peer()
         
-        # Отправка /start для инициализации
+        # Отправка /start
         await self._client.send_message(entity, "/start")
         await asyncio.sleep(2.5)
         
-        # Навигация по меню
-        if menu_flow:
-            await self._navigate_menu(menu_flow)
+        # Полная навигация по меню
+        await self._navigate_menu(menu_flow)
         
         # Отправка запроса
         await self._client.send_message(entity, query)
         await asyncio.sleep(self._response_wait)
         
-        # Сбор ответов от бота
+        # Сбор ответов
         responses = []
-        async for msg in self._client.iter_messages(entity, limit=5):
+        async for msg in self._client.iter_messages(entity, limit=6):
             if msg.sender_id == entity.id:
                 text = msg.text or msg.raw_text
                 if text and len(text) > 3 and not text.startswith("/"):
