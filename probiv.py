@@ -5,9 +5,6 @@
 #             Created by @aaaiaooaaooa // Channel: @hikka_and_heroku
 
 from .. import loader, utils
-from telethon.tl.functions.account import UpdateNotifySettingsRequest
-from telethon.tl.functions.folders import EditPeerFolders
-from telethon.tl.types import InputPeerNotifySettings, InputNotifyPeer, InputFolderPeer
 import asyncio
 import logging
 
@@ -15,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class TeledoXProMod(loader.Module):
-    """Мульти-запрос к боту aybotrobot"""
+    """Мульти-запрос к боту aybotrobot без лишних зависимостей"""
     
     strings = {
         "name": "TeledoXPro",
@@ -28,45 +25,23 @@ class TeledoXProMod(loader.Module):
     async def client_ready(self, client, db):
         self._client = client
         self._target_id = 7592728076
-        self._target_username = "@aybotrobot"
-
-    async def _setup_peer(self):
-        """Мут и архив для бота"""
-        try:
-            entity = await self._client.get_entity(self._target_id)
-            await self._client(UpdateNotifySettingsRequest(
-                peer=InputNotifyPeer(entity),
-                settings=InputPeerNotifySettings(
-                    show_previews=False,
-                    silent=True,
-                    mute_until=2147483647
-                )
-            ))
-            await self._client(EditPeerFolders(
-                folder_peers=[InputFolderPeer(peer=entity, folder_id=1)]
-            ))
-            return True
-        except Exception as e:
-            logger.error(f"Setup error: {e}")
-            return False
 
     async def _send_and_get(self, query, wait=4.0):
-        """Отправка запроса и получение ответа"""
-        await self._setup_peer()
+        """Прямая отправка без использования тяжелых функций мута/архива"""
         try:
             await self._client.send_message(self._target_id, query)
         except Exception as e:
-            logger.warning(f"First send failed, trying start: {e}")
+            logger.warning(f"Send failed: {e}")
             try:
                 await self._client.send_message(self._target_id, "/start")
                 await asyncio.sleep(1.5)
                 await self._client.send_message(self._target_id, query)
-            except Exception as start_err:
-                logger.error(f"Failed to send query: {start_err}")
+            except Exception as err:
+                logger.error(f"Fatal send error: {err}")
                 return None
         
         await asyncio.sleep(wait)
-        async for msg in self._client.iter_messages(self._target_id, limit=4):
+        async for msg in self._client.iter_messages(self._target_id, limit=3):
             if msg.sender_id == self._target_id:
                 text = msg.text or msg.raw_text
                 if text:
@@ -134,4 +109,4 @@ class TeledoXProMod(loader.Module):
             await utils.answer(message, self.strings["result"].format(resp))
         else:
             await utils.answer(message, self.strings["no_response"])
-        
+            
