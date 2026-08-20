@@ -1,26 +1,21 @@
 # -*- coding: utf-8 -*-
-# Hikka модуль: TeledoX Pro v3 (исправленный)
+# Hikka модуль: TeledoX Pro v4 (оптимизированный)
 # Команды: .dox (номер), .doxm (домашний), .doxf (ФИО), .doxp (паспорт)
 # Бот: @aybotrobot (ID: 7592728076)
 # Автор: palofsc
 
 from .. import loader, utils
-from telethon.tl.functions.account import UpdateNotifySettingsRequest
-from telethon.tl.functions.folders import EditPeerFolders
-from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
-from telethon.tl.types import InputPeerNotifySettings, InputNotifyPeer, InputFolderPeer
-from telethon.tl.types import KeyboardButtonCallback
 import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
 
 @loader.tds
-class TeledoXProV3Mod(loader.Module):
-    """Мульти-запрос с управлением инлайн-кнопками (исправленный)"""
+class TeledoXProV4Mod(loader.Module):
+    """Мульти-запрос с управлением инлайн-кнопками (оптимизированный)"""
     
     strings = {
-        "name": "TeledoXProV3",
+        "name": "TeledoXProV4",
         "no_args": "<b>[TeledoX]</b> Укажите аргумент: <code>{}</code>",
         "searching": "<b>[TeledoX]</b> Отправка запроса...",
         "no_response": "<b>[TeledoX]</b> Ответ не получен (тайм-аут).",
@@ -33,60 +28,46 @@ class TeledoXProV3Mod(loader.Module):
         self._target_username = "@aybotrobot"
 
     async def _setup_peer(self):
-        """Мут и архив для бота"""
+        """Мут и архив для бота (через высокоуровневые методы)"""
         try:
             entity = await self._client.get_entity(self._target_id)
-            await self._client(UpdateNotifySettingsRequest(
-                peer=InputNotifyPeer(entity),
-                settings=InputPeerNotifySettings(
-                    show_previews=False,
-                    silent=True,
-                    mute_until=2147483647
-                )
-            ))
-            await self._client(EditPeerFolders(
-                folder_peers=[InputFolderPeer(peer=entity, folder_id=1)]
-            ))
+            # Отключение уведомлений через высокоуровневый метод
+            await self._client.edit_folder(entity, folder=1)
+            await self._client.set_notify_settings(entity, silent=True, mute_until=2147483647)
             return True
         except Exception as e:
             logger.error(f"Setup error: {e}")
             return False
 
     async def _click_button(self, button_text, retries=3):
-        """Поиск и нажатие инлайн-кнопки через GetBotCallbackAnswerRequest"""
+        """Нажатие на инлайн-кнопку через встроенный метод message.click()"""
         for _ in range(retries):
             await asyncio.sleep(1)
-            async for msg in self._client.iter_messages(self._target_id, limit=2):
+            async for msg in self._client.iter_messages(self._target_id, limit=3):
                 if msg.sender_id == self._target_id and msg.reply_markup:
-                    markup = msg.reply_markup
-                    if hasattr(markup, 'rows'):
-                        for row in markup.rows:
-                            for btn in row.buttons:
-                                if isinstance(btn, KeyboardButtonCallback):
-                                    if button_text.lower() in btn.text.lower():
-                                        # Правильный вызов callback-запроса
-                                        await self._client(GetBotCallbackAnswerRequest(
-                                            peer=msg.peer_id,
-                                            msg_id=msg.id,
-                                            data=btn.data
-                                        ))
-                                        await asyncio.sleep(1.5)
-                                        return True
+                    try:
+                        # Высокоуровневый метод click() - работает во всех версиях Telethon
+                        await msg.click(text=button_text)
+                        await asyncio.sleep(1.5)
+                        return True
+                    except Exception as e:
+                        logger.debug(f"Click error: {e}")
+                        continue
         return False
 
-    async def _send_and_get(self, query, menu_flow=None, wait=6.0):
+    async def _send_and_get(self, query, menu_flow=None, wait=7.0):
         """Отправка запроса с навигацией по меню"""
         await self._setup_peer()
         
         # Старт бота
         await self._client.send_message(self._target_id, "/start")
-        await asyncio.sleep(2)
+        await asyncio.sleep(2.5)
         
-        # Проход по меню
+        # Проход по меню через высокоуровневые методы
         if menu_flow:
             for btn_text in menu_flow:
                 await self._click_button(btn_text)
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(2.0)
         
         # Отправка запроса
         await self._client.send_message(self._target_id, query)
@@ -94,10 +75,10 @@ class TeledoXProV3Mod(loader.Module):
         
         # Сбор ответов
         responses = []
-        async for msg in self._client.iter_messages(self._target_id, limit=5):
+        async for msg in self._client.iter_messages(self._target_id, limit=6):
             if msg.sender_id == self._target_id:
                 text = msg.text or msg.raw_text
-                if text and len(text) > 3:
+                if text and len(text) > 5:
                     responses.append(text)
         return responses if responses else None
 
