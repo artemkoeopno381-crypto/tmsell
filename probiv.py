@@ -10,7 +10,7 @@ import asyncio
 
 @loader.tds
 class TeledoXMod(loader.Module):
-    """Шота там по пробиву чета там"""
+    """пробив через тмселл бот по команде .dox"""
     strings = {
         "name": "TeledoX",
         "no_args": "<b>[TeledoX]</b> Слышь, номер то введи: <code>.dox +993...</code>",
