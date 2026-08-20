@@ -1,18 +1,12 @@
-#      _ _ _ _  _ _  _ ____    ____ _  _ ___    _  _ ____ ____ ____ _  _ _  _ 
-#      |__| | |_/  |_/  |__|    |__| |\ | |  \   |__| |___ |__/ |  | |_/  |  | 
-#      |  | | | \  | \  |  |    |  | | \| |__/   |  | |___ |  \ |__| | \  |__| 
-#
-#             Created by @aaaiaooaaooa // Channel: @hikka_and_heroku
+# -*- coding: utf-8 -*-
+# Coded by @aaaiaooaaooa
+# Channel: https://t.me/hikka_and_heroku
 
 from .. import loader, utils
 import asyncio
-import logging
 
-logger = logging.getLogger(__name__)
-
-@loader.tds
-class TeledoXProMod(loader.Module):
-    """Мульти-запрос к боту aybotrobot без лишних зависимостей"""
+class TeledoXCleanMod(loader.Module):
+    """Мульти-запрос к боту"""
     
     strings = {
         "name": "TeledoXPro",
@@ -27,17 +21,14 @@ class TeledoXProMod(loader.Module):
         self._target_id = 7592728076
 
     async def _send_and_get(self, query, wait=4.0):
-        """Прямая отправка без использования тяжелых функций мута/архива"""
         try:
             await self._client.send_message(self._target_id, query)
-        except Exception as e:
-            logger.warning(f"Send failed: {e}")
+        except Exception:
             try:
                 await self._client.send_message(self._target_id, "/start")
                 await asyncio.sleep(1.5)
                 await self._client.send_message(self._target_id, query)
-            except Exception as err:
-                logger.error(f"Fatal send error: {err}")
+            except Exception:
                 return None
         
         await asyncio.sleep(wait)
